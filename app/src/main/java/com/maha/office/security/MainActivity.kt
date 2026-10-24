@@ -43,7 +43,7 @@ class MainActivity : Activity() {
     private fun showConsent() {
         page = newPage()
         page.addView(title("Maha Office Security"))
-        page.addView(subtitle("Local Typing History • POC V1.4"))
+        page.addView(subtitle("Local Typing History • POC V1.5"))
         page.addView(space(18))
         page.addView(sectionTitle("Consent and keyboard setup"))
         page.addView(space(8))
@@ -166,7 +166,9 @@ class MainActivity : Activity() {
             append("Keyboard currently selected: ").append(if (selected) "YES" else "NO").append("\n")
             append("Typing history: ").append(if (recording) "ON" else "PAUSED").append("\n")
             append("Scope: WhatsApp, Instagram and Facebook only\n")
-            append("Storage: encrypted on this phone; no upload")
+            append("Storage: encrypted on this phone; no upload\n")
+            append("Last keyboard status: ").append(prefs.getString(KEY_LAST_IME_STATUS, "No keyboard input status received yet")).append("\n")
+            append("Last save result: ").append(prefs.getString(KEY_LAST_SAVE_STATUS, "No save attempt yet"))
         }
         status.background = rounded(
             if (recording && enabled && selected) Color.rgb(237, 247, 245) else Color.rgb(255, 248, 231),
@@ -377,6 +379,8 @@ class MainActivity : Activity() {
         private const val KEY_CONSENT = "consent_accepted"
         private const val KEY_CONSENT_AT = "consent_accepted_at"
         private const val KEY_RECORDING = "recording_enabled"
+        private const val KEY_LAST_IME_STATUS = "last_ime_status"
+        private const val KEY_LAST_SAVE_STATUS = "last_save_status"
         private const val STATUS_TAG = "keyboard_status"
         private val INK = Color.rgb(16, 42, 45)
     }

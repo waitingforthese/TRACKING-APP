@@ -81,36 +81,47 @@ class TypingHistoryImeService : InputMethodService() {
         updateStatus()
     }
 
-    private fun shouldLog(info: EditorInfo): Boolean {
-        val consent = getSharedPreferences(MAIN_PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CONSENT, false)
-        val enabled = prefs.getBoolean(KEY_RECORDING, true)
-        if (!consent || !enabled) return false
-        if (info.packageName !in TARGET_PACKAGES) return false
-        if ((info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0) return false
+    private fun loggingBlockReason(info: EditorInfo?): String? {
+        val consent = prefs.getBoolean(KEY_CONSENT, false)
+        if (!consent) return "consent not active"
+        if (!prefs.getBoolean(KEY_RECORDING, true)) return "history is paused"
+        if (info == null) return "no text field focused"
+        if (info.packageName !in TARGET_PACKAGES) return "current app is outside the allowed scope"
         val inputType = info.inputType
         val inputClass = inputType and InputType.TYPE_MASK_CLASS
         val variation = inputType and InputType.TYPE_MASK_VARIATION
-        // Restrict logging to ordinary text fields; skip numeric, phone, date/time, unknown, and password fields.
-        if (inputClass != InputType.TYPE_CLASS_TEXT) return false
+        if (inputClass != InputType.TYPE_CLASS_TEXT) return "input type is not ordinary text"
         if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return false
-        return true
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD) return "password field excluded"
+        // Respect a field's own privacy flag; do not bypass it to collect text.
+        if ((info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0) {
+            return "field is marked not for personalized learning"
+        }
+        return null
     }
+
+    private fun shouldLog(info: EditorInfo): Boolean = loggingBlockReason(info) == null
 
     private fun updateStatus() {
         val status = statusView ?: return
-        val consent = getSharedPreferences(MAIN_PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CONSENT, false)
+        val consent = prefs.getBoolean(KEY_CONSENT, false)
         val recording = prefs.getBoolean(KEY_RECORDING, true)
-        val label = appLabel(activePackage)
-        status.text = when {
+        val info = currentInputEditorInfo
+        val label = appLabel(info?.packageName ?: activePackage)
+        val blockReason = loggingBlockReason(info)
+        val message = when {
             !consent -> "History disabled • give consent in app"
             !recording -> "TYPING HISTORY PAUSED"
-            !loggingAllowed -> "Not recording • $label / unsupported or sensitive field"
+            blockReason != null -> "Not recording • $label / $blockReason"
+            !loggingAllowed -> "Not recording • $label / input not ready"
             else -> "● TYPING HISTORY ON • $label"
         }
-        status.setTypeface(null, if (loggingAllowed && recording && consent) Typeface.BOLD else Typeface.NORMAL)
-        status.setTextColor(if (loggingAllowed && recording && consent) Color.rgb(0, 100, 65) else Color.rgb(65, 75, 80))
+        status.text = message
+        status.setTypeface(null, if (message.startsWith("● TYPING HISTORY ON")) Typeface.BOLD else Typeface.NORMAL)
+        status.setTextColor(if (message.startsWith("● TYPING HISTORY ON")) Color.rgb(0, 100, 65) else Color.rgb(65, 75, 80))
+        val oldMessage = prefs.getString(KEY_LAST_IME_STATUS, null)
+        if (oldMessage != message) prefs.edit().putString(KEY_LAST_IME_STATUS, message).apply()
     }
 
     private fun setKeyboardRows() {
@@ -180,10 +191,17 @@ class TypingHistoryImeService : InputMethodService() {
         when (key.action) {
             KeyAction.CHAR -> {
                 val value = if (key.value.length == 1 && key.value[0].isLetter() && shiftOn) key.value.uppercase() else key.value
-                if (ic.commitText(value, 1)) appendToLog(value)
+                if (ic.commitText(value, 1)) {
+                    appendToLog(value)
+                } else {
+                    prefs.edit().putString(KEY_LAST_SAVE_STATUS, "InputConnection rejected character; nothing saved").apply()
+                }
                 if (shiftOn) { shiftOn = false; setKeyboardRows() }
             }
-            KeyAction.SPACE -> if (ic.commitText(" ", 1)) appendToLog(" ")
+            KeyAction.SPACE -> {
+                if (ic.commitText(" ", 1)) appendToLog(" ")
+                else prefs.edit().putString(KEY_LAST_SAVE_STATUS, "InputConnection rejected space; nothing saved").apply()
+            }
             KeyAction.BACKSPACE -> {
                 ic.deleteSurroundingText(1, 0)
                 if (loggingAllowed && isRecordingNow() && buffer.isNotEmpty()) {
@@ -251,7 +269,7 @@ class TypingHistoryImeService : InputMethodService() {
     }
 
     private fun persistBuffer() {
-        if (!loggingAllowed || !isRecordingNow()) return
+        if (!loggingAllowed || !isRecordingNow() || buffer.isBlank()) return
         val record = TypingRecord(
             id = sessionId,
             packageName = activePackage,
@@ -259,7 +277,10 @@ class TypingHistoryImeService : InputMethodService() {
             updatedAt = System.currentTimeMillis(),
             text = buffer
         )
-        TypingLogStore.upsert(this, record)
+        val saved = TypingLogStore.upsert(this, record)
+        val result = if (saved) "Save succeeded (${buffer.length} characters)" else "SAVE FAILED (local storage/encryption error)"
+        prefs.edit().putString(KEY_LAST_SAVE_STATUS, result).apply()
+        if (!saved) android.util.Log.e("MahaOfficeSecurity", "Typing history save failed")
     }
 
     private fun appLabel(pkg: String): String = when (pkg) {
@@ -287,6 +308,8 @@ class TypingHistoryImeService : InputMethodService() {
         private const val MAIN_PREFS = "office_keyboard_prefs"
         private const val KEY_CONSENT = "consent_accepted"
         private const val KEY_RECORDING = "recording_enabled"
+        private const val KEY_LAST_IME_STATUS = "last_ime_status"
+        private const val KEY_LAST_SAVE_STATUS = "last_save_status"
         private const val MAX_BUFFER_CHARS = 4000
         private const val PERSIST_DELAY_MS = 300L
         private val TARGET_PACKAGES = setOf("com.whatsapp", "com.instagram.android", "com.facebook.katana")
