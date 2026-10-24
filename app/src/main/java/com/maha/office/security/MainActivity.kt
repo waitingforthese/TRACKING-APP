@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -279,7 +280,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(24), dp(20), dp(24))
             setBackgroundColor(Color.rgb(247, 249, 249))
         }
-        scroll.addView(page, ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT))
+        scroll.addView(page, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         setContentView(scroll)
         return page
     }
