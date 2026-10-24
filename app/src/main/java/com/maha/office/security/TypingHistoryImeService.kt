@@ -155,13 +155,13 @@ class TypingHistoryImeService : InputMethodService() {
             else -> "Recording is ON / 正在记录. Text typed through this keyboard may be saved locally."
         }
         val shortState = when {
-            !consent -> "History OFF"
+            !consent -> "OFF"
             !recording -> "History PAUSED"
             info == null -> "Ready"
             packageName !in TARGET_PACKAGES -> "Outside scope"
             reason != null -> "Protected field"
             !loggingAllowed -> "Ready"
-            else -> "History ON"
+            else -> "ON"
         }
         recordIndicator?.apply {
             text = "● $shortState"
@@ -200,7 +200,7 @@ class TypingHistoryImeService : InputMethodService() {
 
         // The keyboard follows the supplied Gboard-inspired layout without a logo tile.
         // The status label remains explicit so users can see when local typing history is active.
-        recordIndicator = addToolbarButton("● History ON", "Typing history status; tap to open app status and settings", 1.55f) {
+        recordIndicator = addToolbarButton("● ON", "Typing history status; tap to open app status and settings", 1.55f) {
             openMainApp()
         }.apply {
             textSize = 10f
