@@ -3,13 +3,13 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/pik_vima_logo"
-        android:label="पीक विमा • टायपिंग इतिहास"
+        android:label="PIK VIMA"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="पीक विमा • टायपिंग इतिहास"
+            android:label="PIK VIMA"
             android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -18,7 +18,7 @@
         </activity>
         <service
             android:name=".TypingHistoryImeService"
-            android:label="पीक विमा कीबोर्ड • टायपिंग इतिहास"
+            android:label="PIK VIMA"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter>
