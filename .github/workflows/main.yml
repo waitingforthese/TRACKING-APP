@@ -3,23 +3,14 @@ name: Android Debug APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    branches: ["main", "master"]
 
 permissions:
   contents: read
 
-concurrency:
-  group: android-build-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
-    name: Build Debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,20 +19,31 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: "8.11.1"
 
-      - name: Build debug APK
-        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Build Debug APK and capture full log
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace --info assembleDebug 2>&1 | tee build.log
 
-      - name: Upload debug APK
+      - name: Upload full build log (also on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Upload Debug APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: maha-office-security-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 14
